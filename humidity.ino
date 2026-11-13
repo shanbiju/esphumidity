@@ -30,18 +30,14 @@
 // -----------------------------------------------------------------------------
 // Hardware & Pin Configuration
 // -----------------------------------------------------------------------------
-#ifndef DHTPIN
-#define DHTPIN 22          // DHT11 Data Pin on GPIO (default 22 / D22)
-#endif
+int dhtPin = 22;           // Default GPIO 22 (configurable via NVS & Serial)
 #define DHTTYPE DHT11
 
 // On-board Activity & Status LED (GPIO 2 on ESP32 DevKit)
-#ifndef STATUS_LED_PIN
-#define STATUS_LED_PIN 2
-#endif
+int statusLedPin = 2;      // Default GPIO 2 (configurable via NVS & Serial)
 
 Preferences prefs;
-DHT dht(DHTPIN, DHTTYPE);
+DHT dht(dhtPin, DHTTYPE);
 WebServer server(80);
 
 // Wi-Fi Credentials (configurable via Web Flasher / NVS)
@@ -748,6 +744,41 @@ void checkSerialCommands() {
           Serial.printf("[COM SYNC] Clock set to epoch %lu (%s)\n", epoch, timezoneName);
         }
       }
+    } else if (cmd.startsWith("SET_CONFIG:")) {
+      // Format: SET_CONFIG:<ssid>:<password>:<dht_pin>:<led_pin>
+      // Example: SET_CONFIG:Tech Vue:maxmus8085:22:2
+      int p1 = cmd.indexOf(':');
+      int p2 = cmd.indexOf(':', p1 + 1);
+      int p3 = cmd.indexOf(':', p2 + 1);
+      int p4 = cmd.indexOf(':', p3 + 1);
+      if (p1 > 0 && p2 > 0 && p3 > 0) {
+        String newSsid = cmd.substring(p1 + 1, p2);
+        String newPass = cmd.substring(p2 + 1, p3);
+        int newDhtPin = (p4 > 0) ? cmd.substring(p3 + 1, p4).toInt() : cmd.substring(p3 + 1).toInt();
+        int newLedPin = (p4 > 0) ? cmd.substring(p4 + 1).toInt() : statusLedPin;
+
+        prefs.begin("wifi_cfg", false);
+        if (newSsid.length() > 0) prefs.putString("ssid", newSsid);
+        prefs.putString("pass", newPass);
+        if (newDhtPin > 0) prefs.putInt("dht_pin", newDhtPin);
+        if (newLedPin > 0) prefs.putInt("led_pin", newLedPin);
+        prefs.end();
+
+        if (newSsid.length() > 0) wifi_ssid = newSsid;
+        wifi_password = newPass;
+        if (newDhtPin > 0) dhtPin = newDhtPin;
+        if (newLedPin > 0) statusLedPin = newLedPin;
+
+        Serial.printf("[CONFIG UPDATE] Wi-Fi: %s, DHT Pin: GPIO %d, LED: GPIO %d. Reconnecting...\n",
+                      wifi_ssid.c_str(), dhtPin, statusLedPin);
+
+        dht = DHT(dhtPin, DHTTYPE);
+        dht.begin();
+        pinMode(statusLedPin, OUTPUT);
+
+        WiFi.disconnect();
+        WiFi.begin(wifi_ssid.c_str(), wifi_password.c_str());
+      }
     } else if (cmd.startsWith("SET_WIFI:")) {
       // Format: SET_WIFI:<ssid>:<password>
       int c1 = cmd.indexOf(':');
@@ -913,34 +944,39 @@ void setup() {
   Serial.begin(115200);
   delay(400);
 
-  // Initialize Status LED
-  pinMode(STATUS_LED_PIN, OUTPUT);
-  // Startup indicator pulse
-  for (int i = 0; i < 4; i++) {
-    digitalWrite(STATUS_LED_PIN, HIGH);
-    delay(70);
-    digitalWrite(STATUS_LED_PIN, LOW);
-    delay(70);
-  }
-
-  // Load stored Wi-Fi credentials if customized
+  // Load stored preferences (Wi-Fi, sensor pin, LED pin)
   prefs.begin("wifi_cfg", true);
   String savedSsid = prefs.getString("ssid", "");
   String savedPass = prefs.getString("pass", "");
+  int savedDht = prefs.getInt("dht_pin", 0);
+  int savedLed = prefs.getInt("led_pin", 0);
   prefs.end();
 
   if (savedSsid.length() > 0) {
     wifi_ssid = savedSsid;
     wifi_password = savedPass;
   }
+  if (savedDht > 0) dhtPin = savedDht;
+  if (savedLed > 0) statusLedPin = savedLed;
+
+  // Initialize Status LED
+  pinMode(statusLedPin, OUTPUT);
+  // Startup indicator pulse
+  for (int i = 0; i < 4; i++) {
+    digitalWrite(statusLedPin, HIGH);
+    delay(70);
+    digitalWrite(statusLedPin, LOW);
+    delay(70);
+  }
 
   Serial.println(F("\n======================================================="));
   Serial.println(F(" ESP32 + DHT11 Humidity & Daily Logger Web Server    "));
   Serial.println(F("======================================================="));
-  Serial.printf("Sensor Pin     : GPIO %d (DHT11)\n", DHTPIN);
-  Serial.printf("Status LED Pin : GPIO %d\n", STATUS_LED_PIN);
+  Serial.printf("Sensor Pin     : GPIO %d (DHT11)\n", dhtPin);
+  Serial.printf("Status LED Pin : GPIO %d\n", statusLedPin);
   Serial.printf("Default TZ     : %s (UTC %+ldh %+ldm)\n", timezoneName, gmtOffset_sec / 3600, (gmtOffset_sec % 3600) / 60);
 
+  dht = DHT(dhtPin, DHTTYPE);
   dht.begin();
   Serial.println(F("[INIT] DHT11 sensor initialized."));
 
@@ -951,16 +987,16 @@ void setup() {
 
   int attempts = 0;
   while (WiFi.status() != WL_CONNECTED && attempts < 30) {
-    digitalWrite(STATUS_LED_PIN, HIGH);
+    digitalWrite(statusLedPin, HIGH);
     delay(200);
-    digitalWrite(STATUS_LED_PIN, LOW);
+    digitalWrite(statusLedPin, LOW);
     delay(200);
     Serial.print(".");
     attempts++;
   }
 
   if (WiFi.status() == WL_CONNECTED) {
-    digitalWrite(STATUS_LED_PIN, HIGH); // Solid ON when connected
+    digitalWrite(statusLedPin, HIGH); // Solid ON when connected
     Serial.println(F("\n[WIFI] Connected successfully!"));
     Serial.printf("[WIFI] IP Address : http://%s\n", WiFi.localIP().toString().c_str());
     Serial.printf("[WIFI] Signal     : %d dBm\n", WiFi.RSSI());
@@ -968,7 +1004,7 @@ void setup() {
     // Sync Internet NTP Time
     syncNtpTime();
   } else {
-    digitalWrite(STATUS_LED_PIN, LOW);
+    digitalWrite(statusLedPin, LOW);
     Serial.println(F("\n[WIFI WARNING] Wi-Fi connection taking longer. Operating in background..."));
   }
 
@@ -1025,7 +1061,7 @@ void loop() {
 
 // Wi-Fi watchdog with status LED heartbeat
   if (WiFi.status() != WL_CONNECTED) {
-    digitalWrite(STATUS_LED_PIN, (millis() / 500) % 2); // Slow blink when disconnected
+    digitalWrite(statusLedPin, (millis() / 500) % 2); // Slow blink when disconnected
     static unsigned long lastReconnect = 0;
     if (millis() - lastReconnect > 10000) {
       lastReconnect = millis();
@@ -1035,9 +1071,9 @@ void loop() {
     // Brief heartbeat pulse every 3 seconds to indicate normal operation
     unsigned long mod = millis() % 3000;
     if (mod < 80) {
-      digitalWrite(STATUS_LED_PIN, LOW); // brief blink off
+      digitalWrite(statusLedPin, LOW); // brief blink off
     } else {
-      digitalWrite(STATUS_LED_PIN, HIGH);
+      digitalWrite(statusLedPin, HIGH);
     }
   }
 

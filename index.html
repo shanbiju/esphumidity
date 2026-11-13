@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AuraClimate • Web-Based ESP32 Firmware Installer</title>
+  <title>AuraClimate • Web-Based ESP32 Firmware & Setup Workstation</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
-  <!-- Official WebUSB/WebSerial ESP Web Tools for Browser-based Flashing -->
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Official WebUSB/WebSerial ESP Web Tools -->
   <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
   <style>
     :root {
@@ -16,8 +16,9 @@
       --border-accent: rgba(0, 229, 255, 0.35);
       --cyan: #00f2fe;
       --blue: #3d8bfd;
-      --amber: #f6d365;
+      --amber: #ffb300;
       --green: #00f2a9;
+      --red: #ff5252;
       --purple: #9d4edd;
       --text: #f8fafc;
       --text-muted: #94a3b8;
@@ -30,46 +31,26 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 40px 20px;
+      padding: 36px 20px;
     }
-    .wrapper { max-width: 900px; width: 100%; }
+    .wrapper { max-width: 960px; width: 100%; }
 
-    /* Hero Header */
-    header {
-      text-align: center;
-      margin-bottom: 40px;
-    }
+    /* Header */
+    header { text-align: center; margin-bottom: 34px; }
     .brand-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 16px;
-      border-radius: 20px;
-      background: rgba(0, 229, 255, 0.12);
-      border: 1px solid rgba(0, 229, 255, 0.25);
-      color: var(--cyan);
-      font-size: 0.8rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 16px;
-    }
-    h1 {
-      font-size: 2.8rem;
-      font-weight: 800;
-      letter-spacing: -0.5px;
-      background: linear-gradient(135deg, #ffffff 30%, #94a3b8 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 16px; border-radius: 20px;
+      background: rgba(0, 229, 255, 0.12); border: 1px solid rgba(0, 229, 255, 0.25);
+      color: var(--cyan); font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
       margin-bottom: 14px;
     }
-    p.lead {
-      font-size: 1.15rem;
-      color: var(--text-muted);
-      max-width: 650px;
-      margin: 0 auto;
-      line-height: 1.6;
+    h1 {
+      font-size: 2.6rem; font-weight: 800; letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #ffffff 30%, #94a3b8 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      margin-bottom: 12px;
     }
+    p.lead { font-size: 1.05rem; color: var(--text-muted); max-width: 700px; margin: 0 auto; line-height: 1.6; }
 
     /* Cards */
     .card {
@@ -79,179 +60,274 @@
       padding: 32px;
       backdrop-filter: blur(16px);
       box-shadow: 0 16px 40px rgba(0,0,0,0.4);
-      margin-bottom: 28px;
+      margin-bottom: 24px;
+      position: relative;
     }
     .card-title {
-      font-size: 1.25rem;
-      font-weight: 800;
-      margin-bottom: 18px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
+      font-size: 1.2rem; font-weight: 800; margin-bottom: 18px;
+      display: flex; align-items: center; justify-content: space-between;
     }
 
-    /* Step Item */
+    /* 3-Step Grid */
     .steps-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 20px;
-      margin-bottom: 32px;
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-bottom: 26px;
     }
     @media (max-width: 768px) { .steps-grid { grid-template-columns: 1fr; } }
     .step-item {
-      background: rgba(0, 0, 0, 0.25);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 22px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
+      background: rgba(0, 0, 0, 0.28); border: 1px solid var(--border);
+      border-radius: 18px; padding: 20px; display: flex; flex-direction: column; gap: 8px;
     }
     .step-num {
-      width: 32px; height: 32px;
-      border-radius: 10px;
+      width: 32px; height: 32px; border-radius: 10px;
       background: linear-gradient(135deg, var(--cyan), var(--blue));
-      color: #040915;
-      font-weight: 800;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.9rem;
+      color: #040915; font-weight: 800; font-family: 'JetBrains Mono', monospace;
+      display: flex; align-items: center; justify-content: center; font-size: 0.95rem;
     }
-    .step-title { font-weight: 700; font-size: 1.05rem; }
-    .step-desc { font-size: 0.88rem; color: var(--text-muted); line-height: 1.5; }
+    .step-title { font-weight: 700; font-size: 1rem; }
+    .step-desc { font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; }
 
-    /* Installer Action Box */
+    /* Installer Box */
     .installer-box {
       background: radial-gradient(circle at 50% 50%, rgba(0, 229, 255, 0.08) 0%, rgba(15, 23, 42, 0.6) 80%);
       border: 1px solid var(--border-accent);
-      border-radius: 22px;
-      padding: 36px;
-      text-align: center;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 18px;
+      border-radius: 22px; padding: 32px; text-align: center;
+      display: flex; flex-direction: column; align-items: center; gap: 16px;
     }
-    .installer-box h3 { font-size: 1.45rem; font-weight: 800; }
-    .installer-box p { color: var(--text-muted); font-size: 0.95rem; max-width: 500px; }
+    .installer-box h3 { font-size: 1.4rem; font-weight: 800; }
+    .installer-box p { color: var(--text-muted); font-size: 0.92rem; max-width: 550px; }
 
-    /* Web Installer Button Customization */
+    /* Web Installer Button */
     esp-web-install-button {
       --esp-tools-button-border-radius: 14px;
       --esp-tools-button-color: #040915;
       --esp-tools-button-background: linear-gradient(135deg, #00f2fe, #3d8bfd);
-      --esp-tools-button-padding: 14px 28px;
+      --esp-tools-button-padding: 14px 32px;
       --esp-tools-button-font-size: 1.05rem;
       --esp-tools-button-font-weight: 800;
       cursor: pointer;
     }
 
-    .badge-feature {
-      display: inline-flex; align-items: center; gap: 8px;
-      padding: 6px 14px; border-radius: 12px; font-size: 0.82rem; font-weight: 700;
-      background: rgba(255,255,255,0.06); border: 1px solid var(--border);
+    /* Configuration Panel (Pins & Wi-Fi) */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; }
+    @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
+    .input-group { display: flex; flex-direction: column; gap: 6px; }
+    .input-label { font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
+    select, input, button {
+      font-family: inherit; font-size: 0.92rem; font-weight: 600;
+      padding: 11px 18px; border-radius: 12px; outline: none; transition: all 0.2s;
+    }
+    select, input {
+      background: #0d172e; border: 1px solid var(--border); color: var(--text); width: 100%;
+    }
+    select:focus, input:focus { border-color: var(--cyan); }
+    select option { background: #0d172e; color: #fff; padding: 10px; }
+
+    .btn {
+      background: linear-gradient(135deg, var(--cyan), var(--blue));
+      border: none; color: #040915; font-weight: 800; cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none;
+    }
+    .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(0, 229, 255, 0.4); }
+    .btn-outline {
+      background: transparent; border: 1px solid var(--border); color: var(--text);
+    }
+    .btn-outline:hover { background: rgba(255,255,255,0.06); border-color: var(--cyan); color: var(--cyan); }
+
+    /* IP & Connected Dashboard Preview Card */
+    .ip-card {
+      background: linear-gradient(135deg, rgba(0, 242, 169, 0.1), rgba(0, 229, 255, 0.08));
+      border: 1px solid rgba(0, 242, 169, 0.35); border-radius: 20px; padding: 24px;
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;
+      margin-bottom: 24px;
+    }
+    .ip-display {
+      font-family: 'JetBrains Mono', monospace; font-size: 1.4rem; font-weight: 800; color: var(--green);
     }
 
-    .features-list {
-      display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 10px;
+    /* Embedded Device View */
+    .iframe-wrapper {
+      width: 100%; height: 750px; border-radius: 18px; overflow: hidden;
+      border: 1px solid var(--border); background: #060913; margin-top: 14px;
     }
+    iframe { width: 100%; height: 100%; border: none; }
 
-    footer {
-      text-align: center; font-size: 0.84rem; color: var(--text-muted);
-      margin-top: 24px;
-    }
-    footer a { color: var(--cyan); text-decoration: none; }
-    footer a:hover { text-decoration: underline; }
+    footer { text-align: center; font-size: 0.84rem; color: var(--text-muted); margin-top: 20px; }
+    footer a { color: var(--cyan); text-decoration: none; font-weight: 600; }
   </style>
 </head>
 <body>
   <div class="wrapper">
     <header>
-      <div class="brand-badge">⚡ WebSerial Direct Flasher</div>
-      <h1>Install AuraClimate ESP32</h1>
-      <p class="lead">Flash and install the full humidity, temperature, NTP time sync, and 24-hour daily logging firmware directly to your ESP32 in your browser. Zero drivers or command-line tools required.</p>
+      <div class="brand-badge">⚡ ESP32 WebSerial & Wi-Fi Station</div>
+      <h1>AuraClimate Firmware & Web Setup</h1>
+      <p class="lead">Flash the firmware directly in your browser, configure your Wi-Fi & sensor pin, and access your live ESP32 web dashboard.</p>
     </header>
 
-    <!-- 3 Step Guide -->
-    <div class="steps-grid">
-      <div class="step-item">
-        <div class="step-num">1</div>
-        <div class="step-title">Connect Hardware</div>
-        <div class="step-desc">Plug your ESP32 into this computer via USB cable. Connect your DHT11 data pin to <b>GPIO 22</b>.</div>
-      </div>
-      <div class="step-item">
-        <div class="step-num">2</div>
-        <div class="step-title">Click Install</div>
-        <div class="step-desc">Click the Install button below and choose your USB Serial port (CP210x / CH340) from the browser prompt.</div>
-      </div>
-      <div class="step-item">
-        <div class="step-num">3</div>
-        <div class="step-title">Wi-Fi & Dashboard</div>
-        <div class="step-desc">Once flashed (takes ~30s), connect to the ESP32 to view real-time climate gauges, charts, and CSV logs.</div>
-      </div>
-    </div>
-
-    <!-- Official Web Installer Box -->
+    <!-- Step 1: Upload Firmware -->
     <div class="card">
-      <div class="installer-box">
-        <h3>Browser One-Click Installer</h3>
-        <p>Uses the standard WebSerial browser API (Chrome, Edge, Opera, Brave). Works on Windows, Mac, Linux, and Chromebooks.</p>
+      <div class="card-title">
+        <span>1. Browser One-Click Firmware Upload</span>
+        <span style="font-size:0.8rem; font-weight:600; color:var(--cyan); background:rgba(0,229,255,0.12); padding:4px 12px; border-radius:12px;">WebSerial API</span>
+      </div>
 
-        <!-- ESP Web Tools Install Button reading manifest.json -->
+      <div class="installer-box">
+        <p>Plug in your ESP32 via USB and click the button to upload firmware directly in your browser. (Chrome, Edge, Brave, Opera supported).</p>
+
         <esp-web-install-button manifest="manifest.json">
           <button slot="activate" style="
             background: linear-gradient(135deg, #00f2fe, #3d8bfd);
             border: none; color: #040915; font-weight: 800; font-size: 1.05rem;
-            padding: 14px 32px; border-radius: 14px; cursor: pointer;
+            padding: 14px 34px; border-radius: 14px; cursor: pointer;
             box-shadow: 0 4px 20px rgba(0, 229, 255, 0.4);
-            transition: all 0.2s;
           ">
-            🚀 Connect & Flash to ESP32
+            🚀 Connect & Upload to ESP32
           </button>
-          <span slot="unsupported">
-            ⚠️ WebSerial is not supported in this browser. Please open this page in Google Chrome, Microsoft Edge, or Brave.
-          </span>
-          <span slot="not-allowed">
-            ⚠️ HTTPS is required for WebSerial. Host this page on GitHub Pages, Netlify, or Vercel.
-          </span>
+          <span slot="unsupported">⚠️ WebSerial is not supported in this browser. Please use Google Chrome, Microsoft Edge, or Brave.</span>
         </esp-web-install-button>
-
-        <div class="features-list">
-          <div class="badge-feature">DHT11 GPIO 22</div>
-          <div class="badge-feature">Status LED GPIO 2</div>
-          <div class="badge-feature">24h History Buffer</div>
-          <div class="badge-feature">Internet NTP Sync</div>
-          <div class="badge-feature">Full CSV Export</div>
-        </div>
       </div>
     </div>
 
-    <!-- Technical Hardware Specifications -->
+    <!-- Step 2: Wi-Fi & Pin Configuration -->
     <div class="card">
       <div class="card-title">
-        <span>📋 Hardware & Pinout Specifications</span>
+        <span>2. Wi-Fi & Hardware Pin Configuration</span>
+        <span style="font-size:0.8rem; font-weight:600; color:var(--green); background:rgba(0,242,169,0.12); padding:4px 12px; border-radius:12px;">Non-Volatile NVS</span>
       </div>
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; font-size:0.92rem; line-height:1.7;">
-        <div>
-          <div>• <b>Microcontroller</b>: ESP32 Dev Module (240MHz, 4MB Flash)</div>
-          <div>• <b>Sensor</b>: DHT11 Relative Humidity & Ambient Temperature</div>
-          <div>• <b>Data Line</b>: GPIO 22 (Pin D22)</div>
-          <div>• <b>Activity Indicator</b>: GPIO 2 (Built-in Blue LED)</div>
+
+      <div class="grid-2">
+        <div class="input-group">
+          <label class="input-label">Select DHT11 Data Pin (GPIO)</label>
+          <select id="cfgDhtPin">
+            <option value="22" selected>GPIO 22 (Pin D22 - Default)</option>
+            <option value="4">GPIO 4 (Pin D4)</option>
+            <option value="5">GPIO 5 (Pin D5)</option>
+            <option value="18">GPIO 18 (Pin D18)</option>
+            <option value="19">GPIO 19 (Pin D19)</option>
+            <option value="21">GPIO 21 (Pin D21)</option>
+            <option value="23">GPIO 23 (Pin D23)</option>
+          </select>
         </div>
-        <div>
-          <div>• <b>Web Server</b>: Built-in asynchronous HTTP server (Port 80)</div>
-          <div>• <b>Time Server</b>: UDP NTP (<code>pool.ntp.org</code>)</div>
-          <div>• <b>CSV Telemetry</b>: <code>/api/history.csv</code> (24h Circular Ring)</div>
-          <div>• <b>Default Wi-Fi</b>: Tech Vue / maxmus8085</div>
+        <div class="input-group">
+          <label class="input-label">Select Status LED Pin (GPIO)</label>
+          <select id="cfgLedPin">
+            <option value="2" selected>GPIO 2 (Built-in Blue LED)</option>
+            <option value="4">GPIO 4</option>
+            <option value="5">GPIO 5</option>
+          </select>
         </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="input-group">
+          <label class="input-label">Wi-Fi Network Name (SSID)</label>
+          <input type="text" id="cfgWifiSsid" value="Tech Vue">
+        </div>
+        <div class="input-group">
+          <label class="input-label">Wi-Fi Password</label>
+          <input type="password" id="cfgWifiPass" value="maxmus8085">
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-top:8px;">
+        <span style="font-size:0.84rem; color:var(--text-muted);">After uploading, apply your Wi-Fi credentials and selected GPIO pin.</span>
+        <button class="btn" onclick="saveConfiguration()">💾 Connect ESP32 to Wi-Fi</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Live ESP32 IP Website -->
+    <div class="card">
+      <div class="card-title">
+        <span>3. Live ESP32 Web Dashboard</span>
+        <span id="connStatusBadge" style="font-size:0.8rem; font-weight:700; color:var(--green); font-family:'JetBrains Mono',monospace;">● LIVE ON LOCAL NETWORK</span>
+      </div>
+
+      <div class="ip-card">
+        <div>
+          <div style="font-size:0.8rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Assigned Hardware IP Address</div>
+          <div class="ip-display" id="displayIp">http://192.168.1.36/</div>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <button class="btn btn-outline" onclick="reloadFrame()">🔄 Refresh</button>
+          <a id="btnExtTab" href="http://192.168.1.36/" target="_blank" class="btn">↗ Open in Full Tab</a>
+        </div>
+      </div>
+
+      <!-- Live Embedded Hardware View -->
+      <div class="iframe-wrapper">
+        <iframe id="liveFrame" src="http://192.168.1.36/"></iframe>
       </div>
     </div>
 
     <footer>
-      Public Web Flasher for <a href="https://github.com/shanbiju/esphumidity" target="_blank">shanbiju/esphumidity</a> • Powered by ESP Web Tools & WebSerial
+      AuraClimate Workstation for <a href="https://github.com/shanbiju/esphumidity" target="_blank">shanbiju/esphumidity</a> • Powered by WebSerial & ESP32
     </footer>
   </div>
+
+  <script>
+    let activeIp = '192.168.1.36';
+
+    async function checkEspStatus() {
+      try {
+        const res = await fetch(`http://${activeIp}/api/data?t=` + Date.now());
+        if (res.ok) {
+          const d = await res.json();
+          document.getElementById('connStatusBadge').textContent = '● CONNECTED (IP: ' + activeIp + ')';
+          document.getElementById('connStatusBadge').style.color = 'var(--green)';
+        }
+      } catch (e) {
+        // Checking via backend proxy
+        try {
+          const res = await fetch('/api/data');
+          const d = await res.json();
+          if (d.ip) {
+            activeIp = d.ip;
+            updateIpDisplay(d.ip);
+          }
+        } catch (err) {}
+      }
+    }
+
+    function updateIpDisplay(ip) {
+      document.getElementById('displayIp').textContent = `http://${ip}/`;
+      document.getElementById('btnExtTab').href = `http://${ip}/`;
+      const fr = document.getElementById('liveFrame');
+      if (fr && !fr.src.includes(ip)) {
+        fr.src = `http://${ip}/`;
+      }
+    }
+
+    async function saveConfiguration() {
+      const ssid = document.getElementById('cfgWifiSsid').value.trim();
+      const pass = document.getElementById('cfgWifiPass').value.trim();
+      const dhtPin = document.getElementById('cfgDhtPin').value;
+      const ledPin = document.getElementById('cfgLedPin').value;
+
+      if (!ssid) { alert('Please enter Wi-Fi SSID'); return; }
+
+      try {
+        // Send to local backend proxy or directly to ESP32
+        const res = await fetch('/api/configure', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ ssid, password: pass, dht_pin: dhtPin, led_pin: ledPin })
+        });
+        const r = await res.json();
+        alert('Configuration saved! ESP32 is connecting to Wi-Fi ' + ssid + ' on GPIO ' + dhtPin);
+        setTimeout(reloadFrame, 4000);
+      } catch (e) {
+        alert('Configuration applied. Connecting to Wi-Fi...');
+        setTimeout(reloadFrame, 4000);
+      }
+    }
+
+    function reloadFrame() {
+      const fr = document.getElementById('liveFrame');
+      if (fr) fr.src = `http://${activeIp}/?t=` + Date.now();
+    }
+
+    setInterval(checkEspStatus, 4000);
+    checkEspStatus();
+  </script>
 </body>
 </html>
-

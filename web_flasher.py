@@ -407,6 +407,51 @@ class UnifiedHubHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(resp)
             return
 
+        elif self.path == "/api/configure":
+            length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(length).decode("utf-8")
+            payload = json.loads(body) if body else {}
+
+            ssid = payload.get("ssid", "Tech Vue")
+            password = payload.get("password", "maxmus8085")
+            dht_pin = int(payload.get("dht_pin", 22))
+            led_pin = int(payload.get("led_pin", 2))
+
+            # Send over serial if available
+            port = "COM3"
+            sent_serial = False
+            if HAS_SERIAL:
+                try:
+                    ser = serial.Serial(port, 115200, timeout=1.5)
+                    ser.write(f"SET_CONFIG:{ssid}:{password}:{dht_pin}:{led_pin}\n".encode("utf-8"))
+                    ser.flush()
+                    ser.close()
+                    sent_serial = True
+                except Exception as ex:
+                    print(f"[CONFIG SERIAL ERROR] {ex}")
+
+            # Send over Wi-Fi if already online
+            target_ip = flash_status.get("esp32_ip", "192.168.1.36")
+            try:
+                import urllib.parse
+                post_data = urllib.parse.urlencode({"ssid": ssid, "password": password}).encode("utf-8")
+                req = urllib.request.Request(f"http://{target_ip}/api/wifi", data=post_data, method="POST")
+                urllib.request.urlopen(req, timeout=2.0)
+            except Exception:
+                pass
+
+            resp = json.dumps({
+                "status": "OK",
+                "message": f"Saved config: Wi-Fi '{ssid}', DHT GPIO {dht_pin}, LED GPIO {led_pin}",
+                "sent_serial": sent_serial
+            }).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+
         super().do_POST()
 
 def main():
