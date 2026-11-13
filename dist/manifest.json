@@ -1,0 +1,16 @@
+{
+  "name": "ESP32 Climate & Humidity Workstation",
+  "version": "1.0.0",
+  "home_assistant_domain": "esphome",
+  "new_install_prompt_erase": false,
+  "builds": [
+    {
+      "chipFamily": "ESP32",
+      "parts": [
+        { "path": "bin/bootloader.bin", "offset": 4096 },
+        { "path": "bin/partitions.bin", "offset": 32768 },
+        { "path": "bin/firmware.bin", "offset": 65536 }
+      ]
+    }
+  ]
+}
