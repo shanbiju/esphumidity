@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ESP32 Climate Hub • Studio & Control Station</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #060913;
+      --bg-surface: #0c1222;
+      --bg-card: rgba(15, 23, 42, 0.75);
+      --bg-card-hover: rgba(22, 34, 62, 0.85);
+      --border: rgba(99, 140, 255, 0.14);
+      --border-focus: rgba(0, 229, 255, 0.45);
+      --cyan: #00f2fe;
+      --blue: #3d8bfd;
+      --amber: #f6d365;
+      --green: #00f2a9;
+      --red: #ff5370;
+      --purple: #a855f7;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
+    body {
+      background: radial-gradient(circle at 15% 15%, #101d3b 0%, var(--bg-base) 80%);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Top App Navigation Bar */
+    .navbar {
+      height: 70px;
+      background: rgba(12, 18, 34, 0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 32px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+    }
+    .brand-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--cyan), var(--blue));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      box-shadow: 0 4px 18px rgba(0, 242, 254, 0.35);
+    }
+    .nav-tabs {
+      display: flex;
+      gap: 6px;
+      background: rgba(0, 0, 0, 0.35);
+      padding: 5px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+    }
+    .tab-btn {
+      padding: 8px 18px;
+      border-radius: 10px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 0.88rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active {
+      background: linear-gradient(135deg, rgba(0, 229, 255, 0.18), rgba(61, 139, 253, 0.22));
+      color: var(--cyan);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+      border: 1px solid rgba(0, 229, 255, 0.3);
+    }
+    .nav-status {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .status-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.82rem;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      padding: 6px 14px;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 10px var(--green);
+      animation: pulse 1.8s infinite;
+    }
+    @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.85); } }
+
+    /* Page Container */
+    .main-content {
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 28px 32px;
+      flex: 1;
+    }
+
+    .tab-view { display: none; }
+    .tab-view.active { display: block; animation: fadeIn 0.25s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Cards & Containers */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 26px;
+      backdrop-filter: blur(14px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+      margin-bottom: 24px;
+      transition: border-color 0.2s;
+    }
+    .card:hover { border-color: rgba(99, 140, 255, 0.28); }
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-bottom: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Live Telemetry Metrics Grid */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+    @media (max-width: 1024px) { .metrics-grid { grid-template-columns: 1fr; } }
+
+    .metric-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+    }
+    .metric-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .metric-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 3.6rem;
+      font-weight: 800;
+      line-height: 1.1;
+      margin: 14px 0 8px;
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+    .metric-val .unit { font-size: 1.6rem; font-weight: 600; color: var(--text-muted); }
+    .metric-sub {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+    }
+
+    /* SVG Sparkline & Chart Area */
+    .chart-box {
+      width: 100%;
+      height: 280px;
+      position: relative;
+      margin-top: 14px;
+    }
+    svg.live-chart {
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+      display: block;
+    }
+    .grid-line { stroke: rgba(255, 255, 255, 0.06); stroke-dasharray: 4 4; }
+    .axis-label { fill: var(--text-muted); font-size: 11px; font-family: 'JetBrains Mono', monospace; }
+
+    /* Inputs, Buttons, & Controls */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 20px; }
+    @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
+    .input-group { display: flex; flex-direction: column; gap: 7px; }
+    .input-label { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
+    select, input, button {
+      font-family: inherit;
+      font-size: 0.92rem;
+      font-weight: 600;
+      padding: 11px 18px;
+      border-radius: 12px;
+      outline: none;
+    }
+    select, input {
+      background: #0d172e;
+      border: 1px solid var(--border);
+      color: var(--text);
+      width: 100%;
+      transition: border-color 0.2s;
+    }
+    select:focus, input:focus { border-color: var(--cyan); }
+    select option { background: #0d172e; color: #fff; padding: 10px; }
+
+    .btn {
+      background: linear-gradient(135deg, var(--cyan), var(--blue));
+      border: none;
+      color: #040915;
+      cursor: pointer;
+      font-weight: 800;
+      padding: 11px 22px;
+      border-radius: 12px;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      text-decoration: none;
+    }
+    .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(0, 229, 255, 0.4); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .btn-outline:hover { background: rgba(255,255,255,0.06); border-color: var(--cyan); color: var(--cyan); }
+
+    /* Flasher Terminal */
+    .terminal-box {
+      background: #050811;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      padding: 20px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.86rem;
+      height: 380px;
+      overflow-y: auto;
+      color: #c9d6ea;
+      white-space: pre-wrap;
+      line-height: 1.5;
+    }
+
+    /* Embedded View Iframe */
+    .iframe-container {
+      width: 100%;
+      height: 820px;
+      border-radius: 18px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: #0a0f1d;
+    }
+    iframe { width: 100%; height: 100%; border: none; }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 24px;
+      font-size: 0.82rem;
+      color: var(--text-dim);
+      border-top: 1px solid var(--border);
+      background: rgba(12, 18, 34, 0.4);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top App Navigation Bar -->
+  <nav class="navbar">
+    <div class="nav-brand">
+      <div class="brand-icon">💧</div>
+      <div>
+        <span>ESP32 Climate Hub</span>
+        <span style="font-size:0.75rem; color:var(--cyan); margin-left:8px; font-weight:700;">PRO</span>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="nav-tabs">
+      <button class="tab-btn active" onclick="switchTab('dashboard')">📊 Live Dashboard</button>
+      <button class="tab-btn" onclick="switchTab('history')">📈 Daily Trend Log</button>
+      <button class="tab-btn" onclick="switchTab('flasher')">⚡ Web Flasher & Config</button>
+      <button class="tab-btn" onclick="switchTab('espdirect')">🌐 ESP32 Direct View</button>
+    </div>
+
+    <div class="nav-status">
+      <div class="status-badge" id="connBadge">
+        <span class="pulse-dot"></span>
+        <span id="connStatusText">ONLINE (COM3)</span>
+      </div>
+      <div class="status-badge" id="ipBadge" style="color:var(--cyan);">
+        🔗 192.168.1.36
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Application Body -->
+  <main class="main-content">
+
+    <!-- TAB 1: LIVE DASHBOARD -->
+    <div id="tab-dashboard" class="tab-view active">
+      <div class="metrics-grid">
+        <!-- Relative Humidity -->
+        <div class="metric-card" style="border-top: 4px solid var(--cyan);">
+          <div class="metric-header">
+            <span>Relative Humidity</span>
+            <span style="background:rgba(0,242,254,0.12); color:var(--cyan); padding:3px 10px; border-radius:12px; font-size:0.75rem;" id="comfortBadge">COMFORTABLE</span>
+          </div>
+          <div class="metric-val" style="color:var(--cyan);">
+            <span id="valHum">--</span><span class="unit">%</span>
+          </div>
+          <div class="metric-sub">
+            <span>Min: <b id="minHumToday">--%</b></span>
+            <span>Max: <b id="maxHumToday">--%</b></span>
+            <span>Ideal: <b>40–60%</b></span>
+          </div>
+        </div>
+
+        <!-- Ambient Temperature -->
+        <div class="metric-card" style="border-top: 4px solid var(--amber);">
+          <div class="metric-header">
+            <span>Ambient Temperature</span>
+            <span style="background:rgba(246,211,101,0.12); color:var(--amber); padding:3px 10px; border-radius:12px; font-size:0.75rem;" id="heatIndexBadge">HI: --°C</span>
+          </div>
+          <div class="metric-val" style="color:var(--amber);">
+            <span id="valTemp">--</span><span class="unit">°C</span>
+            <span style="font-size:1.4rem; color:var(--text-muted); font-weight:500;" id="valTempF">(--°F)</span>
+          </div>
+          <div class="metric-sub">
+            <span>Min: <b id="minTempToday">--°C</b></span>
+            <span>Max: <b id="maxTempToday">--°C</b></span>
+            <span>Sensor: <b>DHT11 (D22)</b></span>
+          </div>
+        </div>
+
+        <!-- System & Network Telemetry -->
+        <div class="metric-card" style="border-top: 4px solid var(--green);">
+          <div class="metric-header">
+            <span>System Telemetry</span>
+            <span style="background:rgba(0,242,169,0.12); color:var(--green); padding:3px 10px; border-radius:12px; font-size:0.75rem;" id="timeStrBadge">🕒 12:00:00</span>
+          </div>
+          <div style="margin: 14px 0; display:flex; flex-direction:column; gap:8px;">
+            <div style="display:flex; justify-content:space-between; font-size:0.92rem;">
+              <span style="color:var(--text-muted);">Active Timezone:</span>
+              <b id="tzName" style="color:var(--cyan);">IST (UTC+5:30)</b>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:0.92rem;">
+              <span style="color:var(--text-muted);">Uptime:</span>
+              <b id="uptimeStr">--</b>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:0.92rem;">
+              <span style="color:var(--text-muted);">Total Sensor Reads:</span>
+              <b id="readCount">0</b>
+            </div>
+          </div>
+          <div class="metric-sub">
+            <span>Signal: <b id="rssiVal">- dBm</b></span>
+            <span>NTP Clock: <b id="ntpStatus" style="color:var(--green);">Synchronized</b></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Quick Controls -->
+      <div class="card" style="margin-bottom:24px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+          <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+            <label style="font-size:0.88rem; font-weight:700;">Timezone Sync:</label>
+            <select id="tzQuickSelect" style="width:auto; min-width:240px;">
+              <option value="IST (UTC+5:30)">India (IST, UTC+5:30)</option>
+              <option value="UTC (UTC+0:00)">UTC / GMT</option>
+              <option value="GST (UTC+4:00)">Dubai / UAE (GST, UTC+4:00)</option>
+              <option value="SGT (UTC+8:00)">Singapore (SGT, UTC+8:00)</option>
+              <option value="EST (UTC-5:00)">US Eastern (EST)</option>
+              <option value="PST (UTC-8:00)">US Pacific (PST)</option>
+              <option value="CET (UTC+1:00)">Europe Central (CET)</option>
+            </select>
+            <button class="btn" onclick="syncPcTime()">⚡ Sync PC Time to ESP32</button>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <a href="/api/history.csv" class="btn btn-outline" download="esp32_daily_log.csv">📥 Export 24h CSV Log</a>
+            <button class="btn btn-outline" onclick="fetchLiveTelemetry()">🔄 Refresh Now</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: DAILY TREND LOG CHART -->
+    <div id="tab-history" class="tab-view">
+      <div class="card">
+        <div class="card-title">
+          <div>
+            <h3>24-Hour Continuous Environmental Trend</h3>
+            <p style="font-size:0.82rem; color:var(--text-muted); margin-top:4px;" id="chartLogCountLabel">Auto-scaling from available recorded logs</p>
+          </div>
+          <div style="display:flex; gap:16px; font-size:0.85rem; font-weight:600;">
+            <span style="color:var(--cyan);">● Humidity (%)</span>
+            <span style="color:var(--amber);">● Temperature (°C)</span>
+          </div>
+        </div>
+
+        <div class="chart-box">
+          <svg class="live-chart" id="historySvg" viewBox="0 0 1000 240" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="humFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#00f2fe" stop-opacity="0.35"/>
+                <stop offset="100%" stop-color="#00f2fe" stop-opacity="0.0"/>
+              </linearGradient>
+              <linearGradient id="tempFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#f6d365" stop-opacity="0.3"/>
+                <stop offset="100%" stop-color="#f6d365" stop-opacity="0.0"/>
+              </linearGradient>
+            </defs>
+            <!-- Grid Lines -->
+            <line x1="0" y1="20" x2="1000" y2="20" class="grid-line"/>
+            <line x1="0" y1="75" x2="1000" y2="75" class="grid-line"/>
+            <line x1="0" y1="130" x2="1000" y2="130" class="grid-line"/>
+            <line x1="0" y1="185" x2="1000" y2="185" class="grid-line"/>
+            <line x1="0" y1="215" x2="1000" y2="215" stroke="rgba(255,255,255,0.15)"/>
+
+            <polygon id="polyAreaHum" fill="url(#humFill)" points=""/>
+            <polygon id="polyAreaTemp" fill="url(#tempFill)" points=""/>
+            <polyline id="polyLineHum" fill="none" stroke="#00f2fe" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points=""/>
+            <polyline id="polyLineTemp" fill="none" stroke="#f6d365" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points=""/>
+
+            <!-- Time Labels -->
+            <text x="15" y="235" id="axisStart" class="axis-label">--:--</text>
+            <text x="500" y="235" id="axisMid" class="axis-label" text-anchor="middle">--:--</text>
+            <text x="985" y="235" id="axisEnd" class="axis-label" text-anchor="end">--:--</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: WEB FLASHER & HARDWARE CONFIG -->
+    <div id="tab-flasher" class="tab-view">
+      <div class="card">
+        <div class="card-title">
+          <span>⚡ Hardware Pin & Wi-Fi Configuration</span>
+          <span style="font-size:0.8rem; background:rgba(0,229,255,0.12); color:var(--cyan); padding:4px 10px; border-radius:12px;">Pre-Configured</span>
+        </div>
+        <div class="grid-2">
+          <div class="input-group">
+            <label class="input-label">DHT11 Sensor Data Pin (GPIO)</label>
+            <select id="cfgDhtPin">
+              <option value="22" selected>GPIO 22 (Pin D22 - Default)</option>
+              <option value="4">GPIO 4</option>
+              <option value="5">GPIO 5</option>
+              <option value="18">GPIO 18</option>
+              <option value="19">GPIO 19</option>
+              <option value="21">GPIO 21</option>
+              <option value="23">GPIO 23</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label class="input-label">Activity Status LED Pin (GPIO)</label>
+            <select id="cfgLedPin">
+              <option value="2" selected>GPIO 2 (Built-in Blue LED)</option>
+              <option value="4">GPIO 4</option>
+              <option value="5">GPIO 5</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="input-group">
+            <label class="input-label">Target Wi-Fi Network (SSID)</label>
+            <input type="text" id="cfgWifiSsid" value="Tech Vue">
+          </div>
+          <div class="input-group">
+            <label class="input-label">Wi-Fi Password</label>
+            <input type="password" id="cfgWifiPass" value="maxmus8085">
+          </div>
+        </div>
+
+        <div style="display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin-top:8px;">
+          <div style="flex:2; min-width:260px;">
+            <select id="cfgPortSelect">
+              <option value="COM3">COM3 (Silicon Labs CP210x USB to UART Bridge)</option>
+            </select>
+          </div>
+          <button class="btn btn-outline" onclick="loadComPorts()">🔄 Refresh Ports</button>
+          <button id="btnStartFlash" class="btn" style="flex:1;" onclick="triggerFlash()">🚀 Flash to ESP32</button>
+        </div>
+      </div>
+
+      <!-- Real-Time Flasher Terminal -->
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+          <div class="card-title" style="margin-bottom:0;">📟 Upload Output Terminal</div>
+          <button class="btn btn-outline" style="padding:5px 12px; font-size:0.75rem;" onclick="clearTerm()">Clear Terminal</button>
+        </div>
+        <div class="terminal-box" id="termOutput">Ready. Click 'Flash to ESP32' to compile and upload firmware.</div>
+      </div>
+    </div>
+
+    <!-- TAB 4: ESP32 DIRECT WEB VIEW -->
+    <div id="tab-espdirect" class="tab-view">
+      <div class="card" style="padding:18px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <span style="font-weight:700;">Direct Hardware Server:</span>
+            <span style="font-family:'JetBrains Mono',monospace; color:var(--cyan);" id="directUrlDisplay">http://192.168.1.36/</span>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button class="btn btn-outline" style="padding:6px 14px; font-size:0.8rem;" onclick="reloadIframe()">🔄 Reload Hardware View</button>
+            <a id="extTabLink" href="http://192.168.1.36/" target="_blank" class="btn" style="padding:6px 16px; font-size:0.8rem;">↗ Open in Full Tab</a>
+          </div>
+        </div>
+        <div class="iframe-container">
+          <iframe id="hardwareFrame" src="http://192.168.1.36/"></iframe>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <footer>
+    ESP32 + DHT11 Climate Hub Pro • Built for Antigravity & Silicon Labs CP210x • Real-Time Telemetry & Flashing
+  </footer>
+
+  <script>
+    let activeTab = 'dashboard';
+    let currentEspIp = '192.168.1.36';
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-view').forEach(v => v.classList.remove('active'));
+
+      const targetBtn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.getAttribute('onclick').includes(tabId));
+      if (targetBtn) targetBtn.classList.add('active');
+
+      const targetView = document.getElementById(`tab-${tabId}`);
+      if (targetView) targetView.classList.add('active');
+
+      activeTab = tabId;
+      if (tabId === 'history') fetchHistoryLogs();
+    }
+
+    async function fetchLiveTelemetry() {
+      try {
+        const res = await fetch('/api/data');
+        const d = await res.json();
+
+        if (d.humidity !== undefined) {
+          document.getElementById('valHum').textContent = Number(d.humidity).toFixed(1);
+          const cBadge = document.getElementById('comfortBadge');
+          if (d.humidity < 35) { cBadge.textContent = 'DRY'; cBadge.style.color = 'var(--amber)'; }
+          else if (d.humidity > 65) { cBadge.textContent = 'HUMID'; cBadge.style.color = 'var(--red)'; }
+          else { cBadge.textContent = 'COMFORTABLE'; cBadge.style.color = 'var(--cyan)'; }
+        }
+
+        if (d.temperature !== undefined) {
+          document.getElementById('valTemp').textContent = Number(d.temperature).toFixed(1);
+          document.getElementById('valTempF').textContent = `(${Number(d.temperature_f || (d.temperature*1.8)+32).toFixed(1)}°F)`;
+        }
+
+        if (d.heat_index) document.getElementById('heatIndexBadge').textContent = `HI: ${Number(d.heat_index).toFixed(1)}°C`;
+        if (d.time_str) document.getElementById('timeStrBadge').textContent = `🕒 ${d.time_str}`;
+        if (d.timezone) document.getElementById('tzName').textContent = d.timezone;
+        if (d.uptime_str) document.getElementById('uptimeStr').textContent = d.uptime_str;
+        if (d.reads) document.getElementById('readCount').textContent = d.reads;
+        if (d.rssi) document.getElementById('rssiVal').textContent = `${d.rssi} dBm`;
+
+        if (d.ip) {
+          currentEspIp = d.ip;
+          document.getElementById('ipBadge').textContent = `🔗 ${d.ip}`;
+          document.getElementById('directUrlDisplay').textContent = `http://${d.ip}/`;
+          document.getElementById('extTabLink').href = `http://${d.ip}/`;
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function fetchHistoryLogs() {
+      try {
+        const res = await fetch('/api/history');
+        const d = await res.json();
+
+        if (d.stats) {
+          document.getElementById('minHumToday').textContent = `${d.stats.min_hum.toFixed(1)}%`;
+          document.getElementById('maxHumToday').textContent = `${d.stats.max_hum.toFixed(1)}%`;
+          document.getElementById('minTempToday').textContent = `${d.stats.min_temp.toFixed(1)}°C`;
+          document.getElementById('maxTempToday').textContent = `${d.stats.max_temp.toFixed(1)}°C`;
+        }
+
+        if (d.logs && d.logs.length > 0) {
+          renderChartSvg(d.logs);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function renderChartSvg(logs) {
+      const data = logs.filter(l => l && l.temp !== undefined && l.hum !== undefined);
+      if (data.length === 0) return;
+
+      const width = 1000, height = 240, padTop = 20, padBottom = 35;
+      const plotH = height - padTop - padBottom;
+      const baselineY = height - padBottom;
+
+      const hums = data.map(d => d.hum);
+      const temps = data.map(d => d.temp);
+      const minH = Math.max(0, Math.floor(Math.min(...hums) - 2));
+      const maxH = Math.min(100, Math.ceil(Math.max(...hums) + 2));
+      const rangeH = (maxH - minH) || 10;
+
+      const minT = Math.floor(Math.min(...temps) - 1);
+      const maxT = Math.ceil(Math.max(...temps) + 1);
+      const rangeT = (maxT - minT) || 5;
+
+      const ptsH = data.map((item, i) => {
+        const x = (data.length === 1) ? width/2 : (i / (data.length - 1)) * width;
+        const y = baselineY - ((item.hum - minH) / rangeH) * plotH;
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      });
+
+      const ptsT = data.map((item, i) => {
+        const x = (data.length === 1) ? width/2 : (i / (data.length - 1)) * width;
+        const y = baselineY - ((item.temp - minT) / rangeT) * plotH;
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      });
+
+      const strH = ptsH.join(' ');
+      const strT = ptsT.join(' ');
+
+      document.getElementById('polyLineHum').setAttribute('points', strH);
+      document.getElementById('polyLineTemp').setAttribute('points', strT);
+      document.getElementById('polyAreaHum').setAttribute('points', `0,${baselineY} ${strH} ${width},${baselineY}`);
+      document.getElementById('polyAreaTemp').setAttribute('points', `0,${baselineY} ${strT} ${width},${baselineY}`);
+
+      const formatT = (epoch) => {
+        if (!epoch || epoch < 100000) return '--:--';
+        return new Date(epoch * 1000).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+      };
+
+      document.getElementById('axisStart').textContent = formatT(data[0].t);
+      document.getElementById('axisEnd').textContent = formatT(data[data.length - 1].t);
+      if (data.length > 2) {
+        document.getElementById('axisMid').textContent = formatT(data[Math.floor(data.length / 2)].t);
+      }
+      document.getElementById('chartLogCountLabel').textContent = `${data.length} logged data points recorded in ESP32 memory`;
+    }
+
+    async function syncPcTime() {
+      const epoch = Math.floor(Date.now() / 1000);
+      const tz = document.getElementById('tzQuickSelect').value;
+      try {
+        const res = await fetch(`/api/sync_time?epoch=${epoch}&timezone=${encodeURIComponent(tz)}`);
+        const r = await res.json();
+        alert('Time synchronized: ' + (r.message || 'Success!'));
+        fetchLiveTelemetry();
+      } catch (e) {
+        alert('Sync error: ' + e);
+      }
+    }
+
+    async function loadComPorts() {
+      try {
+        const res = await fetch('/api/ports');
+        const d = await res.json();
+        const sel = document.getElementById('cfgPortSelect');
+        sel.innerHTML = '';
+        if (!d.ports || d.ports.length === 0) {
+          sel.innerHTML = '<option value="COM3">COM3 (Default)</option>';
+          return;
+        }
+        d.ports.forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = p.device;
+          opt.textContent = `${p.device} (${p.description})`;
+          if (p.device === 'COM3') opt.selected = true;
+          sel.appendChild(opt);
+        });
+      } catch (e) {}
+    }
+
+    async function triggerFlash() {
+      const port = document.getElementById('cfgPortSelect').value;
+      const dht_pin = document.getElementById('cfgDhtPin').value;
+      const led_pin = document.getElementById('cfgLedPin').value;
+      const ssid = document.getElementById('cfgWifiSsid').value.trim();
+      const password = document.getElementById('cfgWifiPass').value.trim();
+
+      document.getElementById('btnStartFlash').disabled = true;
+      document.getElementById('termOutput').textContent = `Starting firmware upload on ${port}...\n`;
+
+      try {
+        await fetch('/api/flash', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ port, dht_pin, led_pin, ssid, password })
+        });
+        pollFlashLogs();
+      } catch (err) {
+        alert('Upload trigger failed: ' + err);
+        document.getElementById('btnStartFlash').disabled = false;
+      }
+    }
+
+    async function pollFlashLogs() {
+      try {
+        const res = await fetch('/api/flash_status');
+        const d = await res.json();
+        const term = document.getElementById('termOutput');
+        if (d.logs) {
+          term.textContent = d.logs.join('\n');
+          term.scrollTop = term.scrollHeight;
+        }
+
+        if (d.is_flashing) {
+          setTimeout(pollFlashLogs, 700);
+        } else {
+          document.getElementById('btnStartFlash').disabled = false;
+          if (d.last_exit_code === 0) {
+            reloadIframe();
+          }
+        }
+      } catch (e) {
+        setTimeout(pollFlashLogs, 1500);
+      }
+    }
+
+    function clearTerm() { document.getElementById('termOutput').textContent = ''; }
+    function reloadIframe() {
+      const fr = document.getElementById('hardwareFrame');
+      if (fr) fr.src = `http://${currentEspIp}/?t=` + Date.now();
+    }
+
+    setInterval(fetchLiveTelemetry, 2000);
+    setInterval(fetchHistoryLogs, 10000);
+    fetchLiveTelemetry();
+    loadComPorts();
+  </script>
+</body>
+</html>
