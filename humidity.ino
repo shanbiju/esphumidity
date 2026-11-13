@@ -23,6 +23,7 @@
 
 #include <WiFi.h>
 #include <WebServer.h>
+#include <DNSServer.h>
 #include <DHT.h>
 #include <time.h>
 #include <Preferences.h>
@@ -39,10 +40,13 @@ int statusLedPin = 2;      // Default GPIO 2 (configurable via NVS & Serial)
 Preferences prefs;
 DHT dht(dhtPin, DHTTYPE);
 WebServer server(80);
+DNSServer dnsServer;
+const byte DNS_PORT = 53;
+bool apModeActive = false;
 
-// Wi-Fi Credentials (configurable via Web Flasher / NVS)
-String wifi_ssid     = "Tech Vue";
-String wifi_password = "maxmus8085";
+// Wi-Fi Credentials (configurable via Web Flasher / Setup Portal / NVS)
+String wifi_ssid     = "";
+String wifi_password = "";
 
 // -----------------------------------------------------------------------------
 // Time & Timezone Configuration (Internet NTP + Local Sync)
@@ -937,6 +941,236 @@ void handleNotFound() {
 }
 
 // -----------------------------------------------------------------------------
+// Setup Portal Web Page (Served in AP Mode at 192.168.4.1)
+// -----------------------------------------------------------------------------
+const char SETUP_HTML[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ESP32 Setup & Wi-Fi Configuration</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #060913; --card: rgba(15, 23, 42, 0.92);
+      --cyan: #00f2fe; --blue: #3d8bfd; --green: #00f2a9;
+      --text: #f8fafc; --text-dim: #94a3b8; --border: rgba(255,255,255,0.12);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
+    body {
+      background: radial-gradient(circle at 50% 0%, #101d3b 0%, var(--bg) 90%);
+      color: var(--text); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 16px;
+    }
+    .box {
+      width: 100%; max-width: 480px; background: var(--card); border: 1px solid var(--border);
+      border-radius: 24px; padding: 32px 28px; box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+    }
+    .badge {
+      display: inline-block; font-size: 11px; font-weight: 800; text-transform: uppercase;
+      letter-spacing: 1px; color: var(--cyan); background: rgba(0,242,254,0.12);
+      padding: 5px 12px; border-radius: 12px; margin-bottom: 12px;
+    }
+    h1 { font-size: 1.8rem; font-weight: 800; margin-bottom: 8px; }
+    p.desc { font-size: 0.92rem; color: var(--text-dim); margin-bottom: 24px; line-height: 1.5; }
+    .form-group { margin-bottom: 18px; }
+    label { display: block; font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-dim); margin-bottom: 6px; letter-spacing: 0.5px; }
+    input, select {
+      width: 100%; background: #0b1329; border: 1px solid var(--border);
+      padding: 12px 14px; border-radius: 12px; color: #fff; font-size: 14px; outline: none; font-family: inherit; font-weight: 600;
+    }
+    input:focus, select:focus { border-color: var(--cyan); box-shadow: 0 0 10px rgba(0,242,254,0.3); }
+    select option { background: #0b1329; color: #fff; }
+    .scan-btn {
+      font-size: 12px; background: rgba(255,255,255,0.08); border: 1px solid var(--border);
+      color: var(--cyan); padding: 6px 12px; border-radius: 8px; cursor: pointer; float: right; margin-top: -24px;
+    }
+    .btn {
+      width: 100%; margin-top: 10px; background: linear-gradient(135deg, var(--cyan), var(--blue));
+      border: none; color: #060913; font-weight: 800; font-size: 15px; padding: 14px; border-radius: 14px;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .btn:hover { box-shadow: 0 4px 20px rgba(0,242,254,0.4); transform: translateY(-1px); }
+    .status-msg {
+      margin-top: 16px; padding: 12px; border-radius: 10px; font-size: 13px; font-weight: 600; text-align: center; display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <div class="badge">ESP32 Setup Hotspot</div>
+    <h1>Connect ESP32</h1>
+    <p class="desc">Select your Wi-Fi network and confirm your DHT11 sensor pin. ESP32 will connect and save your settings.</p>
+
+    <form id="setupForm" onsubmit="submitConfig(event)">
+      <div class="form-group">
+        <label>Wi-Fi Network (SSID)</label>
+        <button type="button" class="scan-btn" onclick="scanWifi()">📡 Scan</button>
+        <div style="margin-bottom:8px;">
+          <select id="ssidSelect" onchange="if(this.value) document.getElementById('ssidInput').value = this.value">
+            <option value="">-- Choose or type Wi-Fi SSID --</option>
+          </select>
+        </div>
+        <input type="text" id="ssidInput" placeholder="Enter Wi-Fi SSID" required>
+      </div>
+
+      <div class="form-group">
+        <label>Wi-Fi Password</label>
+        <input type="password" id="passInput" placeholder="Enter Wi-Fi Password">
+      </div>
+
+      <div class="form-group">
+        <label>DHT11 Sensor Pin (GPIO)</label>
+        <select id="dhtPinInput">
+          <option value="22" selected>GPIO 22 (Pin D22 - Default)</option>
+          <option value="4">GPIO 4</option>
+          <option value="5">GPIO 5</option>
+          <option value="18">GPIO 18</option>
+          <option value="19">GPIO 19</option>
+          <option value="21">GPIO 21</option>
+          <option value="23">GPIO 23</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Status LED Pin (GPIO)</label>
+        <select id="ledPinInput">
+          <option value="2" selected>GPIO 2 (Default ESP32 LED)</option>
+          <option value="4">GPIO 4</option>
+          <option value="5">GPIO 5</option>
+        </select>
+      </div>
+
+      <button type="submit" class="btn" id="saveBtn">💾 Save & Connect ESP32</button>
+    </form>
+
+    <div class="status-msg" id="statusBox"></div>
+  </div>
+
+  <script>
+    async function scanWifi() {
+      const select = document.getElementById('ssidSelect');
+      select.innerHTML = '<option>Scanning nearby networks...</option>';
+      try {
+        const res = await fetch('/api/scan');
+        const networks = await res.json();
+        select.innerHTML = '<option value="">-- Select from detected networks --</option>';
+        networks.forEach(n => {
+          const opt = document.createElement('option');
+          opt.value = n.ssid;
+          opt.textContent = `${n.ssid} (${n.rssi} dBm)`;
+          select.appendChild(opt);
+        });
+      } catch (e) {
+        select.innerHTML = '<option value="">(Scan failed - type SSID manually)</option>';
+      }
+    }
+
+    async function submitConfig(e) {
+      e.preventDefault();
+      const ssid = document.getElementById('ssidInput').value.trim();
+      const password = document.getElementById('passInput').value.trim();
+      const dht_pin = document.getElementById('dhtPinInput').value;
+      const led_pin = document.getElementById('ledPinInput').value;
+
+      const btn = document.getElementById('saveBtn');
+      const box = document.getElementById('statusBox');
+      btn.disabled = true;
+      btn.textContent = 'Saving & Connecting...';
+
+      box.style.display = 'block';
+      box.style.background = 'rgba(0,242,254,0.15)';
+      box.style.color = '#00f2fe';
+      box.textContent = 'Applying settings... ESP32 is connecting to ' + ssid;
+
+      try {
+        await fetch('/api/setup_wifi', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+          body: `ssid=${encodeURIComponent(ssid)}&password=${encodeURIComponent(password)}&dht_pin=${dht_pin}&led_pin=${led_pin}`
+        });
+
+        box.style.background = 'rgba(0,242,169,0.15)';
+        box.style.color = '#00f2a9';
+        box.innerHTML = `<strong>Settings Saved!</strong><br>ESP32 is now connecting to <b>${ssid}</b>.<br>You can reconnect your phone/laptop to <b>${ssid}</b> to open the dashboard.`;
+      } catch (err) {
+        box.style.background = 'rgba(0,242,169,0.15)';
+        box.style.color = '#00f2a9';
+        box.innerHTML = `<strong>Reconnecting!</strong> ESP32 saved the configuration and is restarting network.`;
+      }
+    }
+
+    window.onload = () => { scanWifi(); };
+  </script>
+</body>
+</html>
+)rawliteral";
+
+void startSetupAp() {
+  apModeActive = true;
+  WiFi.mode(WIFI_AP_STA);
+  WiFi.softAP("ESP32-Climate-Setup");
+  IPAddress apIP(192, 168, 4, 1);
+  IPAddress netMsk(255, 255, 255, 0);
+  WiFi.softAPConfig(apIP, apIP, netMsk);
+
+  dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
+  dnsServer.start(DNS_PORT, "*", apIP);
+
+  Serial.println(F("\n[AP MODE] Broadcast started!"));
+  Serial.println(F("[AP MODE] SSID    : ESP32-Climate-Setup (Open)"));
+  Serial.println(F("[AP MODE] Web UI  : http://192.168.4.1/"));
+}
+
+void handleSetupPage() {
+  server.sendHeader("Connection", "close");
+  server.send(200, "text/html", SETUP_HTML);
+}
+
+void handleApiScan() {
+  int n = WiFi.scanNetworks();
+  String json = "[";
+  for (int i = 0; i < n; i++) {
+    if (i > 0) json += ",";
+    json += "{\"ssid\":\"" + WiFi.SSID(i) + "\",\"rssi\":" + String(WiFi.RSSI(i)) + "}";
+  }
+  json += "]";
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  server.send(200, "application/json", json);
+}
+
+void handleApiSetupWifi() {
+  String newSsid = server.hasArg("ssid") ? server.arg("ssid") : "";
+  String newPass = server.hasArg("password") ? server.arg("password") : "";
+  int newDht = server.hasArg("dht_pin") ? server.arg("dht_pin").toInt() : dhtPin;
+  int newLed = server.hasArg("led_pin") ? server.arg("led_pin").toInt() : statusLedPin;
+
+  if (newSsid.length() > 0) {
+    prefs.begin("wifi_cfg", false);
+    prefs.putString("ssid", newSsid);
+    prefs.putString("pass", newPass);
+    if (newDht > 0) prefs.putInt("dht_pin", newDht);
+    if (newLed > 0) prefs.putInt("led_pin", newLed);
+    prefs.end();
+
+    wifi_ssid = newSsid;
+    wifi_password = newPass;
+    if (newDht > 0) { dhtPin = newDht; dht = DHT(dhtPin, DHTTYPE); dht.begin(); }
+    if (newLed > 0) { statusLedPin = newLed; pinMode(statusLedPin, OUTPUT); }
+
+    server.sendHeader("Access-Control-Allow-Origin", "*");
+    server.send(200, "application/json", "{\"status\":\"OK\",\"message\":\"Credentials saved\"}");
+
+    Serial.printf("\n[CONFIG SAVED] Connecting to '%s' (DHT GPIO %d)...\n", wifi_ssid.c_str(), dhtPin);
+    delay(500);
+    WiFi.begin(wifi_ssid.c_str(), wifi_password.c_str());
+    return;
+  }
+  server.send(400, "application/json", "{\"status\":\"ERROR\",\"message\":\"Empty SSID\"}");
+}
+
+// -----------------------------------------------------------------------------
 // Arduino Setup
 // -----------------------------------------------------------------------------
 void setup() {
@@ -955,6 +1189,10 @@ void setup() {
   if (savedSsid.length() > 0) {
     wifi_ssid = savedSsid;
     wifi_password = savedPass;
+  } else {
+    // Fallback default
+    wifi_ssid = "Tech Vue";
+    wifi_password = "maxmus8085";
   }
   if (savedDht > 0) dhtPin = savedDht;
   if (savedLed > 0) statusLedPin = savedLed;
@@ -986,11 +1224,11 @@ void setup() {
   WiFi.begin(wifi_ssid.c_str(), wifi_password.c_str());
 
   int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 30) {
+  while (WiFi.status() != WL_CONNECTED && attempts < 25) {
     digitalWrite(statusLedPin, HIGH);
-    delay(200);
+    delay(150);
     digitalWrite(statusLedPin, LOW);
-    delay(200);
+    delay(150);
     Serial.print(".");
     attempts++;
   }
@@ -1005,11 +1243,21 @@ void setup() {
     syncNtpTime();
   } else {
     digitalWrite(statusLedPin, LOW);
-    Serial.println(F("\n[WIFI WARNING] Wi-Fi connection taking longer. Operating in background..."));
+    Serial.println(F("\n[WIFI] Could not connect to configured Wi-Fi. Launching Setup AP Hotspot..."));
+    startSetupAp();
   }
 
   // Register Web Server Endpoints
-  server.on("/", HTTP_GET, handleRoot);
+  server.on("/", HTTP_GET, []() {
+    if (apModeActive && WiFi.status() != WL_CONNECTED) {
+      handleSetupPage();
+    } else {
+      handleRoot();
+    }
+  });
+  server.on("/setup", HTTP_GET, handleSetupPage);
+  server.on("/api/scan", HTTP_GET, handleApiScan);
+  server.on("/api/setup_wifi", HTTP_POST, handleApiSetupWifi);
   server.on("/api/data", HTTP_GET, handleApiData);
   server.on("/api/history", HTTP_GET, handleApiHistory);
   server.on("/api/history.csv", HTTP_GET, handleApiHistoryCsv);
@@ -1030,12 +1278,22 @@ void setup() {
     }
     server.send(400, "application/json", "{\"status\":\"ERROR\",\"message\":\"Missing ssid\"}");
   });
-  server.onNotFound(handleNotFound);
+
+  // Captive Portal Redirection
+  server.onNotFound([]() {
+    if (apModeActive && WiFi.status() != WL_CONNECTED) {
+      server.sendHeader("Location", "http://192.168.4.1/setup", true);
+      server.send(302, "text/plain", "");
+    } else {
+      handleNotFound();
+    }
+  });
 
   server.begin();
   Serial.println(F("[SERVER] HTTP Server started on port 80."));
   Serial.println(F("[SERVER] Endpoints ready:"));
   Serial.println(F("         - Dashboard   : /"));
+  Serial.println(F("         - Setup Portal: /setup"));
   Serial.println(F("         - Live API    : /api/data"));
   Serial.println(F("         - History API : /api/history"));
   Serial.println(F("         - CSV Export  : /api/history.csv"));
@@ -1049,6 +1307,9 @@ void setup() {
 // Arduino Loop
 // -----------------------------------------------------------------------------
 void loop() {
+  if (apModeActive) {
+    dnsServer.processNextRequest();
+  }
   server.handleClient();
   readDhtSensor();
   checkSerialCommands();
@@ -1059,15 +1320,22 @@ void loop() {
     syncNtpTime();
   }
 
-// Wi-Fi watchdog with status LED heartbeat
+  // Wi-Fi watchdog with status LED heartbeat
   if (WiFi.status() != WL_CONNECTED) {
     digitalWrite(statusLedPin, (millis() / 500) % 2); // Slow blink when disconnected
     static unsigned long lastReconnect = 0;
-    if (millis() - lastReconnect > 10000) {
+    if (millis() - lastReconnect > 15000) {
       lastReconnect = millis();
       WiFi.reconnect();
     }
   } else {
+    // If connected, turn off AP mode to save RAM and power if active
+    if (apModeActive) {
+      apModeActive = false;
+      dnsServer.stop();
+      WiFi.mode(WIFI_STA);
+      Serial.println(F("[WIFI] STA mode connected! Disabled Setup AP."));
+    }
     // Brief heartbeat pulse every 3 seconds to indicate normal operation
     unsigned long mod = millis() % 3000;
     if (mod < 80) {

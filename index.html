@@ -221,17 +221,26 @@
       <div class="grid-2">
         <div class="input-group">
           <label class="input-label">Wi-Fi Network Name (SSID)</label>
-          <input type="text" id="cfgWifiSsid" value="Tech Vue">
+          <input type="text" id="cfgWifiSsid" placeholder="e.g. MyHomeWifi or Tech Vue" value="Tech Vue">
         </div>
         <div class="input-group">
           <label class="input-label">Wi-Fi Password</label>
-          <input type="password" id="cfgWifiPass" value="maxmus8085">
+          <input type="password" id="cfgWifiPass" placeholder="Wi-Fi Password" value="maxmus8085">
         </div>
       </div>
 
+      <div style="background: rgba(0, 229, 255, 0.08); border: 1px solid rgba(0, 229, 255, 0.25); border-radius: 14px; padding: 16px; margin: 16px 0; font-size: 0.88rem; line-height: 1.5;">
+        <span style="color:var(--cyan); font-weight:800;">📶 Connecting to other Wi-Fi networks:</span><br>
+        1. <b>Method 1 (WebSerial USB):</b> Keep USB plugged in and click <b>"Send Wi-Fi Config via USB"</b> below.<br>
+        2. <b>Method 2 (Phone / Hotspot):</b> If your ESP32 cannot find Wi-Fi, it broadcasts an open hotspot named <b><code style="color:var(--green); font-family:'JetBrains Mono';">ESP32-Climate-Setup</code></b>. Connect to it on your phone or laptop and visit <b><a href="http://192.168.4.1" target="_blank" style="color:var(--cyan); font-weight:700;">http://192.168.4.1</a></b> to scan and select any Wi-Fi network!
+      </div>
+
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-top:8px;">
-        <span style="font-size:0.84rem; color:var(--text-muted);">After uploading, apply your Wi-Fi credentials and selected GPIO pin.</span>
-        <button class="btn" onclick="saveConfiguration()">💾 Connect ESP32 to Wi-Fi</button>
+        <span style="font-size:0.84rem; color:var(--text-muted);">Choose your network & sensor GPIO pin.</span>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <button class="btn" style="background: linear-gradient(135deg, #00f2fe, #3d8bfd);" onclick="sendConfigViaSerial()">⚡ Send Config via USB Serial</button>
+          <button class="btn btn-outline" onclick="saveConfiguration()">🌐 Send via Network API</button>
+        </div>
       </div>
     </div>
 
@@ -294,6 +303,42 @@
       const fr = document.getElementById('liveFrame');
       if (fr && !fr.src.includes(ip)) {
         fr.src = `http://${ip}/`;
+      }
+    }
+
+    async function sendConfigViaSerial() {
+      const ssid = document.getElementById('cfgWifiSsid').value.trim();
+      const pass = document.getElementById('cfgWifiPass').value.trim();
+      const dhtPin = document.getElementById('cfgDhtPin').value;
+      const ledPin = document.getElementById('cfgLedPin').value;
+
+      if (!ssid) { alert('Please enter Wi-Fi SSID'); return; }
+      if (!('serial' in navigator)) {
+        alert('WebSerial is not supported in this browser. Please use Google Chrome or Microsoft Edge.');
+        return;
+      }
+
+      try {
+        const port = await navigator.serial.requestPort();
+        await port.open({ baudRate: 115200 });
+
+        const encoder = new TextEncoderStream();
+        const outputDone = encoder.readable.pipeTo(port.writable);
+        const writer = encoder.writable.getWriter();
+
+        const cmd = `SET_CONFIG:${ssid}:${pass}:${dhtPin}:${ledPin}\n`;
+        await writer.write(cmd);
+        writer.releaseLock();
+
+        alert(`Config sent successfully via USB to ESP32!\nWi-Fi: ${ssid}\nDHT Pin: GPIO ${dhtPin}\nESP32 is now connecting...`);
+
+        setTimeout(async () => {
+          try {
+            await port.close();
+          } catch(e){}
+        }, 1500);
+      } catch (err) {
+        alert('Could not send via Serial. If the port is busy, unplug and re-plug USB or use the ESP32-Climate-Setup Wi-Fi Hotspot at http://192.168.4.1\n\nError: ' + err.message);
       }
     }
 
