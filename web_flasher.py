@@ -229,6 +229,31 @@ class UnifiedHubHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(data)
             return
 
+        elif self.path == "/manifest.json":
+            manifest_path = os.path.join(BASE_DIR, "dist", "manifest.json")
+            if os.path.exists(manifest_path):
+                with open(manifest_path, "rb") as f:
+                    data = f.read()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+                return
+
+        elif self.path.startswith("/bin/"):
+            bin_rel = self.path[len("/bin/"):]
+            bin_path = os.path.join(BASE_DIR, "dist", "bin", bin_rel)
+            if os.path.exists(bin_path):
+                with open(bin_path, "rb") as f:
+                    data = f.read()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/octet-stream")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+                return
+
         elif self.path == "/api/data":
             with telemetry_lock:
                 if latest_telemetry.get("time_str") in ["--", None]:
