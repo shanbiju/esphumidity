@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 sensor_log.csv
 .vscode/
+

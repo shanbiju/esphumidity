@@ -152,6 +152,9 @@ def run_flash_worker(port, dht_pin=22, led_pin=2, ssid="Tech Vue", password="max
             if not ip_found:
                 ip_found = "192.168.1.36"
 
+            with flash_lock:
+                flash_status["esp32_ip"] = ip_found
+
             log("=" * 60)
             log(f"🌐 ESP32 ASSIGNED IP ADDRESS: {ip_found}")
             log(f"🔗 Direct Web Dashboard URL : http://{ip_found}/")
@@ -371,6 +374,21 @@ HTML_PAGE = """<!DOCTYPE html>
       </div>
       <div class="terminal" id="termOutput">Waiting for user command... Click 'Flash to ESP32' to begin.</div>
     </div>
+
+    <!-- Embedded Live ESP32 Web Dashboard -->
+    <div class="card" id="dashboardCard" style="display:none;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px; flex-wrap:wrap; gap:10px;">
+        <div class="section-title" style="margin-bottom:0;">🌐 5. Live ESP32 Climate Dashboard</div>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <span id="dashIpLabel" style="font-family:'JetBrains Mono',monospace; font-size:0.85rem; color:var(--accent-green); background:rgba(0,242,169,0.12); padding:4px 12px; border-radius:12px;">http://192.168.1.36/</span>
+          <button class="btn btn-outline" style="padding:6px 12px; font-size:0.8rem;" onclick="reloadFrame()">🔄 Reload</button>
+          <a id="openNewTabLink" href="http://192.168.1.36/" target="_blank" class="btn" style="padding:6px 14px; font-size:0.8rem; text-decoration:none;">↗ Open in Full Tab</a>
+        </div>
+      </div>
+      <div style="width:100%; height:750px; border-radius:16px; overflow:hidden; border:1px solid var(--card-border); background:#0a0f1d;">
+        <iframe id="espFrame" src="about:blank" style="width:100%; height:100%; border:none;"></iframe>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -465,6 +483,17 @@ HTML_PAGE = """<!DOCTYPE html>
             document.getElementById('statusBadge').innerText = 'Flash Successful (100%)';
             vLed.className = 'led-dot led-connected';
             document.getElementById('ledDesc').innerText = 'Solid ON: Wi-Fi Connected & Telemetry Active';
+
+            // Reveal and load the embedded website into the application
+            const ip = d.esp32_ip || '192.168.1.36';
+            const url = `http://${ip}/`;
+            document.getElementById('dashboardCard').style.display = 'block';
+            document.getElementById('dashIpLabel').textContent = url;
+            document.getElementById('openNewTabLink').href = url;
+            const iframe = document.getElementById('espFrame');
+            if (iframe.src === 'about:blank' || !iframe.src.includes(ip)) {
+              iframe.src = url;
+            }
           } else {
             document.getElementById('statusBadge').className = 'status-pill status-error';
             document.getElementById('statusBadge').innerText = 'Upload Failed (Code ' + d.last_exit_code + ')';
@@ -479,6 +508,13 @@ HTML_PAGE = """<!DOCTYPE html>
 
     function clearLogs() {
       document.getElementById('termOutput').textContent = '';
+    }
+
+    function reloadFrame() {
+      const iframe = document.getElementById('espFrame');
+      if (iframe && iframe.src) {
+        iframe.src = iframe.src;
+      }
     }
 
     loadPorts();
