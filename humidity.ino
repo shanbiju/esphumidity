@@ -781,7 +781,9 @@ void checkSerialCommands() {
         pinMode(statusLedPin, OUTPUT);
 
         WiFi.disconnect();
+        delay(100);
         WiFi.begin(wifi_ssid.c_str(), wifi_password.c_str());
+        Serial.printf("[WIFI] Connecting to '%s'...\n", wifi_ssid.c_str());
       }
     } else if (cmd.startsWith("SET_WIFI:")) {
       // Format: SET_WIFI:<ssid>:<password>
@@ -1258,6 +1260,7 @@ void setup() {
   server.on("/setup", HTTP_GET, handleSetupPage);
   server.on("/api/scan", HTTP_GET, handleApiScan);
   server.on("/api/setup_wifi", HTTP_POST, handleApiSetupWifi);
+  server.on("/api/configure", HTTP_POST, handleApiSetupWifi); // Alias for web UI
   server.on("/api/data", HTTP_GET, handleApiData);
   server.on("/api/history", HTTP_GET, handleApiHistory);
   server.on("/api/history.csv", HTTP_GET, handleApiHistoryCsv);

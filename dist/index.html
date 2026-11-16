@@ -318,27 +318,32 @@
         return;
       }
 
+      let port;
       try {
-        const port = await navigator.serial.requestPort();
+        port = await navigator.serial.requestPort();
         await port.open({ baudRate: 115200 });
 
-        const encoder = new TextEncoderStream();
-        const outputDone = encoder.readable.pipeTo(port.writable);
-        const writer = encoder.writable.getWriter();
+        const encoder = new TextEncoder();
+        const writer = port.writable.getWriter();
 
-        const cmd = `SET_CONFIG:${ssid}:${pass}:${dhtPin}:${ledPin}\n`;
-        await writer.write(cmd);
+        // Send a newline first to clear any partial line, then the command
+        const cmd = `\nSET_CONFIG:${ssid}:${pass}:${dhtPin}:${ledPin}\n`;
+        await writer.write(encoder.encode(cmd));
+        await new Promise(r => setTimeout(r, 200));
         writer.releaseLock();
 
-        alert(`Config sent successfully via USB to ESP32!\nWi-Fi: ${ssid}\nDHT Pin: GPIO ${dhtPin}\nESP32 is now connecting...`);
+        alert(`Config sent successfully to ESP32!\nWi-Fi SSID: ${ssid}\nDHT Data Pin: GPIO ${dhtPin}\nStatus LED Pin: GPIO ${ledPin}\n\nESP32 is now connecting to your Wi-Fi!`);
 
         setTimeout(async () => {
           try {
             await port.close();
           } catch(e){}
-        }, 1500);
+        }, 800);
       } catch (err) {
-        alert('Could not send via Serial. If the port is busy, unplug and re-plug USB or use the ESP32-Climate-Setup Wi-Fi Hotspot at http://192.168.4.1\n\nError: ' + err.message);
+        if (port) {
+          try { await port.close(); } catch(e){}
+        }
+        alert('Could not send via Serial. If the port is busy, unplug and re-plug the USB cable once or use the fallback hotspot.\n\nError: ' + err.message);
       }
     }
 
@@ -350,19 +355,25 @@
 
       if (!ssid) { alert('Please enter Wi-Fi SSID'); return; }
 
+      // Try sending directly to active ESP32 IP
       try {
-        // Send to local backend proxy or directly to ESP32
-        const res = await fetch('/api/configure', {
+        const bodyData = `ssid=${encodeURIComponent(ssid)}&password=${encodeURIComponent(pass)}&dht_pin=${dhtPin}&led_pin=${ledPin}`;
+        const targetUrl = (activeIp && !window.location.host.includes(activeIp)) 
+          ? `http://${activeIp}/api/setup_wifi` 
+          : `/api/setup_wifi`;
+
+        await fetch(targetUrl, {
           method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ ssid, password: pass, dht_pin: dhtPin, led_pin: ledPin })
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+          body: bodyData,
+          mode: 'no-cors'
         });
-        const r = await res.json();
-        alert('Configuration saved! ESP32 is connecting to Wi-Fi ' + ssid + ' on GPIO ' + dhtPin);
-        setTimeout(reloadFrame, 4000);
+
+        alert(`Settings sent to ESP32 (http://${activeIp})!\nSSID: ${ssid}\nDHT Pin: GPIO ${dhtPin}\nESP32 is restarting Wi-Fi...`);
+        setTimeout(reloadFrame, 5000);
       } catch (e) {
-        alert('Configuration applied. Connecting to Wi-Fi...');
-        setTimeout(reloadFrame, 4000);
+        // Fallback to sending via serial
+        alert('Could not reach ESP32 over network. Please use "Send Config via USB Serial" with USB plugged in!');
       }
     }
 
