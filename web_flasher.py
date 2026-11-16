@@ -83,7 +83,7 @@ def update_ino_pins_and_wifi(dht_pin, led_pin, ssid, password):
     except Exception as e:
         print(f"[PIN/WIFI UPDATE ERROR] {e}")
 
-def run_flash_worker(port, dht_pin=22, led_pin=2, ssid="YOUR_WIFI_SSID", password="YOUR_WIFI_PASSWORD"):
+def run_flash_worker(port, dht_pin=22, led_pin=2, ssid="", password=""):
     global flash_status
     with flash_lock:
         flash_status["is_flashing"] = True
@@ -379,8 +379,8 @@ class UnifiedHubHandler(http.server.SimpleHTTPRequestHandler):
             port = payload.get("port", "COM3")
             dht_pin = int(payload.get("dht_pin", 22))
             led_pin = int(payload.get("led_pin", 2))
-            ssid = payload.get("ssid", "YOUR_WIFI_SSID")
-            password = payload.get("password", "YOUR_WIFI_PASSWORD")
+            ssid = payload.get("ssid", "")
+            password = payload.get("password", "")
 
             with flash_lock:
                 if flash_status["is_flashing"]:
@@ -412,8 +412,8 @@ class UnifiedHubHandler(http.server.SimpleHTTPRequestHandler):
             body = self.rfile.read(length).decode("utf-8")
             payload = json.loads(body) if body else {}
 
-            ssid = payload.get("ssid", "YOUR_WIFI_SSID")
-            password = payload.get("password", "YOUR_WIFI_PASSWORD")
+            ssid = payload.get("ssid", "")
+            password = payload.get("password", "")
             dht_pin = int(payload.get("dht_pin", 22))
             led_pin = int(payload.get("led_pin", 2))
 

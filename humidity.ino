@@ -3,7 +3,6 @@
  * Project: ESP32 + DHT11 Live Humidity & Temperature Web Server + Full Daily Logger
  * Target: ESP32 Dev Module (COM3)
  * Sensor: DHT11 on GPIO 22 (D22)
- * Wi-Fi: "YOUR_WIFI_SSID" / "YOUR_WIFI_PASSWORD"
  * Features:
  *   - Automatic Internet NTP Time Sync with Configurable Timezone (Default: IST UTC+5:30)
  *   - Auto Sync Time via Serial/COM Port (`SYNC_TIME:<epoch>:<timezone_str>`)
@@ -217,7 +216,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
                     <h1>ESP32 Climate Monitor</h1>
                     <div class="subtitle">
                         <span>GPIO 22 (DHT11)</span> •
-                        <span id="wifiSsid">YOUR_WIFI_SSID</span> •
+                        <span id="wifiSsid">Wi-Fi Connected</span> •
                         <span id="currentTime">--:--:--</span>
                     </div>
                 </div>
@@ -387,7 +386,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         </div>
 
         <footer>
-            ESP32 + DHT11 Climate Telemetry • Connected on COM3 & YOUR_WIFI_SSID Network
+            ESP32 + DHT11 Climate Telemetry • Live Web Server
         </footer>
     </div>
 
@@ -750,7 +749,7 @@ void checkSerialCommands() {
       }
     } else if (cmd.startsWith("SET_CONFIG:")) {
       // Format: SET_CONFIG:<ssid>:<password>:<dht_pin>:<led_pin>
-      // Example: SET_CONFIG:YOUR_WIFI_SSID:YOUR_WIFI_PASSWORD:22:2
+      // Example: SET_CONFIG:MySSID:MyPassword:22:2
       int p1 = cmd.indexOf(':');
       int p2 = cmd.indexOf(':', p1 + 1);
       int p3 = cmd.indexOf(':', p2 + 1);
@@ -1191,10 +1190,6 @@ void setup() {
   if (savedSsid.length() > 0) {
     wifi_ssid = savedSsid;
     wifi_password = savedPass;
-  } else {
-    // Fallback default
-    wifi_ssid = "YOUR_WIFI_SSID";
-    wifi_password = "YOUR_WIFI_PASSWORD";
   }
   if (savedDht > 0) dhtPin = savedDht;
   if (savedLed > 0) statusLedPin = savedLed;

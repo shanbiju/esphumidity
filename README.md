@@ -1,15 +1,15 @@
 # ESP32 + DHT11 Live Humidity & Temperature Web Server
 
-Live environmental monitoring system built with **ESP32** and **DHT11**. The ESP32 connects to your local Wi-Fi (**YOUR_WIFI_SSID**), reads humidity and temperature on **GPIO 22 (D22)**, and hosts an embedded asynchronous web backend displaying real-time data on any web browser.
+Live environmental monitoring system built with **ESP32** and **DHT11**. The ESP32 connects to your local Wi-Fi, reads humidity and temperature on **GPIO 22 (D22)**, and hosts an embedded asynchronous web backend displaying real-time data on any web browser.
 
 ---
 
 ## 📌 Features
 
 - **Hardware Pin**: DHT11 Data connected to **GPIO 22 (D22)**.
-- **Wi-Fi Pre-configured**:
-  - **SSID**: `YOUR_WIFI_SSID`
-  - **Password**: `YOUR_WIFI_PASSWORD`
+- **Wi-Fi Configuration**:
+  - Connects to your configured local Wi-Fi.
+  - Automatic fallback hotspot (`ESP32-Climate-Setup` at `192.168.4.1`) for easy Wi-Fi configuration.
 - **Embedded Web Backend**:
   - Serves an interactive dark-mode glassmorphic dashboard directly on port `80`.
   - Auto-refreshes live data asynchronously via `fetch('/api/data')` every 2 seconds (no full page reload).
@@ -73,13 +73,13 @@ In Arduino IDE, open **Tools** → **Manage Libraries...** and install:
 
 1. Open the **Serial Monitor** in Arduino IDE (`Ctrl + Shift + M`).
 2. Set baud rate to **115200 baud**.
-3. When the ESP32 starts, it connects to **YOUR_WIFI_SSID** and outputs:
+3. When the ESP32 starts, it connects to your Wi-Fi and outputs:
    ```text
    [WIFI] Connected successfully!
    [WIFI] IP Address : http://192.168.1.XXX
    [SERVER] HTTP Server started on port 80.
    ```
-4. On any mobile phone, tablet, or PC connected to the **YOUR_WIFI_SSID** Wi-Fi network:
+4. On any mobile phone, tablet, or PC connected to the same Wi-Fi network:
    - Open your browser (Chrome, Edge, Safari, Firefox).
    - Navigate to:
      ```text
